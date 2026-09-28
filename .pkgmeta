@@ -1,0 +1,13 @@
+externals:
+  Libs/LibStub: https://repos.curseforge.com/wow/ace3/trunk/LibStub
+  Libs/CallbackHandler-1.0: https://repos.curseforge.com/wow/callbackhandler/trunk/CallbackHandler-1.0
+  Libs/AceComm-3.0: https://repos.curseforge.com/wow/ace3/trunk/AceComm-3.0
+  Libs/HereBeDragons: https://github.com/Nevcairiel/HereBeDragons.git
+  Libs/Huddle: https://github.com/Pingumania/Huddle.git
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+ignore:
+  - "*.md"
