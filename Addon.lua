@@ -5,17 +5,50 @@ local RESTRICTED_TYPES = {
 	[Enum.AddOnRestrictionType.Map] = true,
 }
 
+local MAX_RACE_ID = 100
+
 local friends = {}
+local previous = {}
+local raceFactions = {}
+local playerFaction
+
+local function CacheRaceFactions()
+	local race, faction
+
+	for raceID = 1, MAX_RACE_ID do
+		race = C_CreatureInfo.GetRaceInfo(raceID)
+		faction = race and C_CreatureInfo.GetFactionInfo(raceID)
+
+		if faction then
+			raceFactions[race.clientFileString] = faction.groupTag
+		end
+	end
+end
+
+local function IsOtherFaction(englishRace)
+	local faction = raceFactions[englishRace]
+
+	return faction ~= nil and faction ~= "Neutral" and faction ~= playerFaction
+end
+
+local function IsCandidate(info)
+	if not info then
+		return false
+	end
+
+	local _, englishClass, _, englishRace = GetPlayerInfoByGUID(info.guid)
+
+	return not IsOtherFaction(englishRace), englishClass
+end
 
 local function RefreshCharacterFriends()
-	local info, englishClass
+	local info, candidate, englishClass
 
 	for index = 1, C_FriendList.GetNumFriends() do
 		info = C_FriendList.GetFriendInfoByIndex(index)
+		candidate, englishClass = IsCandidate(info)
 
-		if info and info.connected then
-			englishClass = select(2, GetPlayerInfoByGUID(info.guid))
-
+		if candidate and info.connected then
 			friends[info.name] = {
 				classFile = englishClass,
 				className = info.className,
@@ -25,32 +58,35 @@ local function RefreshCharacterFriends()
 	end
 end
 
-local function RefreshBattleNetFriends()
-	local accountInfo, gameAccountInfo, name
+function ns:RefreshFriends()
+	if not playerFaction then
+		return
+	end
 
-	for index = 1, BNGetNumFriends() do
-		accountInfo = C_BattleNet.GetFriendAccountInfo(index)
-		gameAccountInfo = accountInfo and accountInfo.gameAccountInfo
+	friends, previous = previous, friends
+	wipe(friends)
 
-		if gameAccountInfo and gameAccountInfo.isOnline and gameAccountInfo.characterName then
-			name = gameAccountInfo.characterName
+	RefreshCharacterFriends()
 
-			if not friends[name] then
-				friends[name] = {
-					classFile = gameAccountInfo.classFilename,
-					className = gameAccountInfo.className,
-					level = gameAccountInfo.characterLevel,
-				}
-			end
+	for name in next, friends do
+		if not previous[name] then
+			ns:Ping(name)
+		end
+	end
+
+	for name in next, previous do
+		if not friends[name] then
+			ns:RemovePeer(name)
 		end
 	end
 end
 
-function ns:RefreshFriends()
-	wipe(friends)
-
-	RefreshCharacterFriends()
-	RefreshBattleNetFriends()
+function ns:PingFriends()
+	for name in next, friends do
+		if not ns:IsPeer(name) then
+			ns:Ping(name)
+		end
+	end
 end
 
 function ns:GetFriend(name)
@@ -61,42 +97,23 @@ function ns:IsFriend(name)
 	return ns:GetFriend(name) ~= nil
 end
 
-function ns:SetChannel(name, password)
-	ns:LeaveChannel()
-
-	FriendMapDB.channel = name
-	FriendMapDB.password = password
-
-	if name then
-		ns:JoinChannel(name, password)
-	end
-end
-
 function ns:OnLoad()
 	if not FriendMapDB then
 		_G.FriendMapDB = {}
 	end
+
+	FriendMapDB.channel = nil
+	FriendMapDB.password = nil
 end
 
 function ns:OnLogin()
-	ns.playerName = UnitName("player")
+	playerFaction = UnitFactionGroup("player")
 
+	CacheRaceFactions()
 	ns:RefreshFriends()
-
-	if FriendMapDB.channel then
-		ns:JoinChannel(FriendMapDB.channel, FriendMapDB.password)
-	end
 end
 
 function ns:FRIENDLIST_UPDATE()
-	ns:RefreshFriends()
-end
-
-function ns:BN_FRIEND_ACCOUNT_ONLINE()
-	ns:RefreshFriends()
-end
-
-function ns:BN_FRIEND_ACCOUNT_OFFLINE()
 	ns:RefreshFriends()
 end
 
@@ -106,10 +123,10 @@ function ns:ADDON_RESTRICTION_STATE_CHANGED(restrictionType, state)
 	end
 
 	if state == Enum.AddOnRestrictionState.Activating then
-		ns:BroadcastGone()
-		ns:StopBroadcasting()
+		ns:PauseBroadcasting()
 		ns:RemoveAllPins()
 	elseif state == Enum.AddOnRestrictionState.Inactive then
-		ns:StartBroadcasting()
+		ns:ResumeBroadcasting()
+		ns:PingFriends()
 	end
 end

@@ -5,10 +5,13 @@ local HBD = LibStub("HereBeDragons-2.0")
 
 local PREFIX = "FriendMap"
 local TICK_INTERVAL = 2
+local HELLO = "hello"
+local ACK = "ack"
 local GONE = "gone"
 
-local channelName
+local peers = {}
 local ticker
+local paused
 
 local function Serialize(instanceId, x, y)
 	if not instanceId then
@@ -19,10 +22,6 @@ local function Serialize(instanceId, x, y)
 end
 
 local function Deserialize(message)
-	if message == GONE then
-		return nil
-	end
-
 	local instanceId, x, y = string.match(message, "^(%d+):([%d%.]+):([%d%.]+)$")
 	if not instanceId then
 		return nil
@@ -31,31 +30,49 @@ local function Deserialize(message)
 	return tonumber(instanceId), tonumber(x), tonumber(y)
 end
 
-local function Send(message)
-	if not channelName then
-		return
-	end
+local function Send(message, name)
+	AceComm:SendCommMessage(PREFIX, message, "WHISPER", name)
+end
 
-	local channelId = GetChannelName(channelName)
-	if channelId == 0 then
-		return
-	end
+local function AddPeer(name)
+	peers[name] = true
 
-	AceComm:SendCommMessage(PREFIX, message, "CHANNEL", channelId)
+	ns:StartBroadcasting()
+end
+
+function ns:IsPeer(name)
+	return peers[name] ~= nil
+end
+
+function ns:RemovePeer(name)
+	peers[name] = nil
+
+	ns:RemovePin(name)
+
+	if not next(peers) then
+		ns:StopBroadcasting()
+	end
+end
+
+function ns:Ping(name)
+	Send(HELLO, name)
+end
+
+function ns:SendGone(name)
+	Send(GONE, name)
 end
 
 function ns:Broadcast()
 	local x, y, instanceId = HBD:GetPlayerWorldPosition()
+	local message = Serialize(instanceId, x, y)
 
-	Send(Serialize(instanceId, x, y))
-end
-
-function ns:BroadcastGone()
-	Send(GONE)
+	for name in next, peers do
+		Send(message, name)
+	end
 end
 
 function ns:StartBroadcasting()
-	if ticker or not channelName then
+	if ticker or paused or not next(peers) then
 		return
 	end
 
@@ -71,47 +88,46 @@ function ns:StopBroadcasting()
 	ticker = nil
 end
 
-function ns:JoinChannel(name, password)
-	JoinTemporaryChannel(name, password)
-
-	channelName = name
-
-	for index = 1, NUM_CHAT_WINDOWS do
-		ChatFrame_RemoveChannel(_G["ChatFrame" .. index], name)
+function ns:PauseBroadcasting()
+	for name in next, peers do
+		Send(GONE, name)
 	end
+
+	paused = true
+
+	ns:StopBroadcasting()
+end
+
+function ns:ResumeBroadcasting()
+	paused = nil
 
 	ns:StartBroadcasting()
 end
 
-function ns:LeaveChannel()
-	if not channelName then
-		return
-	end
-
-	ns:BroadcastGone()
-	ns:StopBroadcasting()
-	LeaveChannelByName(channelName)
-
-	channelName = nil
-
-	ns:RemoveAllPins()
-end
-
 function ns:OnCommReceived(prefix, message, distribution, sender)
-	if prefix ~= PREFIX or sender == ns.playerName then
+	if prefix ~= PREFIX or distribution ~= "WHISPER" or paused then
 		return
 	end
+
+	sender = Ambiguate(sender, "none")
 
 	if not ns:IsFriend(sender) then
 		return
 	end
 
-	local instanceId, x, y = Deserialize(message)
-
-	if instanceId then
-		ns:UpdatePin(sender, instanceId, x, y)
-	else
+	if message == HELLO then
+		Send(ACK, sender)
+		AddPeer(sender)
+	elseif message == ACK then
+		AddPeer(sender)
+	elseif message == GONE then
 		ns:RemovePin(sender)
+	else
+		local instanceId, x, y = Deserialize(message)
+
+		if instanceId then
+			ns:UpdatePin(sender, instanceId, x, y)
+		end
 	end
 end
 
