@@ -44,7 +44,7 @@ end
 local function RefreshCharacterFriends()
 	local info, candidate, englishClass
 
-	for index = 1, C_FriendList.GetNumFriends() do
+	for index = 1, C_FriendList.GetNumFriends() or 0 do
 		info = C_FriendList.GetFriendInfoByIndex(index)
 		candidate, englishClass = IsCandidate(info)
 
@@ -93,7 +93,7 @@ function ns:GetBlockCandidates()
 	local candidates = {}
 	local info
 
-	for index = 1, C_FriendList.GetNumFriends() do
+	for index = 1, C_FriendList.GetNumFriends() or 0 do
 		info = C_FriendList.GetFriendInfoByIndex(index)
 
 		if IsCandidate(info) then
