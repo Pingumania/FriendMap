@@ -32,7 +32,7 @@ local function IsOtherFaction(englishRace)
 end
 
 local function IsCandidate(info)
-	if not info then
+	if not info or FriendMapDB.blocked[info.name] then
 		return false
 	end
 
@@ -89,12 +89,41 @@ function ns:PingFriends()
 	end
 end
 
+function ns:GetBlockCandidates()
+	local candidates = {}
+	local info
+
+	for index = 1, C_FriendList.GetNumFriends() do
+		info = C_FriendList.GetFriendInfoByIndex(index)
+
+		if IsCandidate(info) then
+			candidates[#candidates + 1] = {value = info.name, label = info.name}
+		end
+	end
+
+	return candidates
+end
+
 function ns:GetFriend(name)
 	return friends[Ambiguate(name, "none")]
 end
 
 function ns:IsFriend(name)
 	return ns:GetFriend(name) ~= nil
+end
+
+function ns:BlockFriend(name)
+	if ns:IsPeer(name) then
+		ns:SendGone(name)
+	end
+
+	FriendMapDB.blocked[name] = true
+	ns:RefreshFriends()
+end
+
+function ns:UnblockFriend(name)
+	FriendMapDB.blocked[name] = nil
+	ns:RefreshFriends()
 end
 
 function ns:OnLoad()
@@ -104,6 +133,7 @@ function ns:OnLoad()
 
 	FriendMapDB.channel = nil
 	FriendMapDB.password = nil
+	FriendMapDB.blocked = FriendMapDB.blocked or {}
 end
 
 function ns:OnLogin()
