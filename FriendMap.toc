@@ -3,6 +3,7 @@
 ## Title: FriendMap
 ## Notes: Shows friends, with this addon on the world map and minimap
 ## Category: Map
+## IconAtlas: crosshair_track_32
 ## Author: Pingumania
 ## Version: @project-version@
 
