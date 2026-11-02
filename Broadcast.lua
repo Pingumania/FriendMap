@@ -22,7 +22,7 @@ local function Serialize(instanceId, x, y)
 end
 
 local function Deserialize(message)
-	local instanceId, x, y = string.match(message, "^(%d+):([%d%.]+):([%d%.]+)$")
+	local instanceId, x, y = string.match(message, "^(%d+):(-?[%d%.]+):(-?[%d%.]+)$")
 	if not instanceId then
 		return nil
 	end
