@@ -2,9 +2,6 @@ local _, ns = ...
 
 local Pins = LibStub("HereBeDragons-Pins-2.0")
 
-local PIN_TEXTURE = 518448
-local PIN_SIZE = 12
-
 local worldPins = {}
 local minimapPins = {}
 
@@ -21,13 +18,22 @@ local function OnEnter(self)
 	GameTooltip:Show()
 end
 
+local function SetPinTexture(texture, value)
+	if C_Texture.GetAtlasInfo(value) then
+		texture:SetAtlas(value)
+	else
+		texture:SetTexture(value)
+	end
+end
+
 local function CreatePin(name)
+	local size = ns:GetOption("pinSize")
 	local pin = CreateFrame("Frame", nil, UIParent)
-	pin:SetSize(PIN_SIZE, PIN_SIZE)
+	pin:SetSize(size, size)
 
 	local texture = pin:CreateTexture(nil, "OVERLAY")
 	texture:SetAllPoints()
-	texture:SetTexture(PIN_TEXTURE)
+	SetPinTexture(texture, ns:GetOption("pinTexture"))
 
 	pin.texture = texture
 	pin.unitName = name
@@ -66,7 +72,7 @@ function ns:UpdatePin(name, instanceId, x, y)
 	SetClassColor(worldPin, friend and friend.classFile)
 	SetClassColor(minimapPin, friend and friend.classFile)
 
-	Pins:AddWorldMapIconWorld(ns, worldPin, instanceId, x, y)
+	Pins:AddWorldMapIconWorld(ns, worldPin, instanceId, x, y, ns:GetOption("continentPins") and HBD_PINS_WORLDMAP_SHOW_CONTINENT or nil)
 	Pins:AddMinimapIconWorld(ns, minimapPin, instanceId, x, y)
 end
 
@@ -87,3 +93,17 @@ function ns:RemoveAllPins()
 	Pins:RemoveAllWorldMapIcons(ns)
 	Pins:RemoveAllMinimapIcons(ns)
 end
+
+ns:RegisterOptionCallback("pinSize", function(value)
+	for name, worldPin in next, worldPins do
+		worldPin:SetSize(value, value)
+		minimapPins[name]:SetSize(value, value)
+	end
+end)
+
+ns:RegisterOptionCallback("pinTexture", function(value)
+	for name, worldPin in next, worldPins do
+		SetPinTexture(worldPin.texture, value)
+		SetPinTexture(minimapPins[name].texture, value)
+	end
+end)
